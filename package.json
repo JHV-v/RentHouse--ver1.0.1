@@ -5,11 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "dev:3001": "next dev -p 3001",
-    "dev:clean": "if exist .next rmdir /s /q .next && next dev -p 3001",
+    "dev:clean": "rimraf .next && next dev -p 3001",
     "build": "next build",
     "start": "next start",
     "serve:3001": "next start -p 3001",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "next": "^14.2.35",
@@ -24,7 +26,9 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.35",
     "postcss": "^8.5.6",
+    "rimraf": "^5.0.10",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "vitest": "^2.1.9"
   }
 }

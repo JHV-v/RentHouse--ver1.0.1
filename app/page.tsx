@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { type MouseEvent } from 'react'
 import { inputHtml } from './stitch-html'
+import { saveRentFormData } from './lib/storage'
 
 type RentFormData = {
   salary: string
@@ -14,6 +15,26 @@ type RentFormData = {
   activeOptions: Record<string, string[]>
   commuteTimes: Record<string, string>
 }
+
+// 通过相邻的 <label> 文本定位输入项，避免按顺序取值在 UI 调整后错位
+function findInputByLabel(root: HTMLElement, labelText: string): HTMLInputElement | null {
+  const labels = Array.from(root.querySelectorAll('label'))
+  const label = labels.find((el) => el.textContent?.trim() === labelText)
+  if (!label) return null
+  // input 与 label 同属一个 .space-y-2 容器
+  const container = label.parentElement
+  return container?.querySelector('input') ?? null
+}
+
+function findSelectByLabel(root: HTMLElement, labelText: string): HTMLSelectElement | null {
+  const labels = Array.from(root.querySelectorAll('label'))
+  const label = labels.find((el) => el.textContent?.trim() === labelText)
+  if (!label) return null
+  const container = label.parentElement
+  return container?.querySelector('select') ?? null
+}
+
+const valueOf = (el: HTMLInputElement | HTMLSelectElement | null) => el?.value ?? ''
 
 const getLabelText = (element: Element) =>
   element.querySelector('label')?.textContent?.trim() ?? ''
@@ -62,21 +83,16 @@ const collectCommuteTimes = (root: HTMLElement) => {
   return commuteTimes
 }
 
-const collectRentFormData = (root: HTMLElement): RentFormData => {
-  const numberInputs = Array.from(root.querySelectorAll('input[type="number"]')) as HTMLInputElement[]
-  const selects = Array.from(root.querySelectorAll('select')) as HTMLSelectElement[]
-
-  return {
-    salary: numberInputs[0]?.value ?? '',
-    rent: numberInputs[1]?.value ?? '',
-    deposit: selects[0]?.value ?? '',
-    agencyFee: selects[1]?.value ?? '',
-    paymentCycle: selects[2]?.value ?? '',
-    contractTerm: selects[3]?.value ?? '',
-    activeOptions: collectActiveOptions(root),
-    commuteTimes: collectCommuteTimes(root),
-  }
-}
+const collectRentFormData = (root: HTMLElement): RentFormData => ({
+  salary: valueOf(findInputByLabel(root, '月薪资')),
+  rent: valueOf(findInputByLabel(root, '月租金')),
+  deposit: valueOf(findSelectByLabel(root, '押金')),
+  agencyFee: valueOf(findSelectByLabel(root, '中介费')),
+  paymentCycle: valueOf(findSelectByLabel(root, '付款周期')),
+  contractTerm: valueOf(findSelectByLabel(root, '合同期限')),
+  activeOptions: collectActiveOptions(root),
+  commuteTimes: collectCommuteTimes(root),
+})
 
 export default function HomePage() {
   const router = useRouter()
@@ -86,7 +102,7 @@ export default function HomePage() {
 
     if (button?.textContent?.includes('查看我的租房性价比报告')) {
       const formData = collectRentFormData(event.currentTarget)
-      sessionStorage.setItem('rentFormData', JSON.stringify(formData))
+      saveRentFormData(formData)
       router.push('/result')
     }
   }

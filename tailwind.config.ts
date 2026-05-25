@@ -2,6 +2,17 @@ import type { Config } from 'tailwindcss'
 
 const config: Config = {
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
+  // 这些类名由 Stitch HTML 内联的运行时 JS 动态注入到 DOM 上，
+  // 源代码字符串里搜不到，必须 safelist 否则会被 purge。
+  safelist: [
+    'tag-active',
+    'tag-inactive',
+    'detail-tag-active',
+    'detail-tag-inactive',
+    'drag-over',
+    'dragging',
+    'draggable-item',
+  ],
   theme: {
     extend: {
       colors: {
