@@ -5,3 +5,8 @@ out/
 .vercel/
 *.tsbuildinfo
 next-env.d.ts
+
+# 临时输出 / 调试文件
+.out-*.txt
+.commit-msg.txt
+.tmp-*
