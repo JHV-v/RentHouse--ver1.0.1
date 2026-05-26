@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  TAG_DICTIONARY,
-  calculateScore,
-  normalizeInput,
-} from './score'
+import { TAG_DICTIONARY, calculateScore, normalizeInput } from './score'
 
 describe('normalizeInput', () => {
   it('把中文标签翻译成 1-5 分数', () => {

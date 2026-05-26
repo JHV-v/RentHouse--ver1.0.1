@@ -6,6 +6,14 @@ import { mapFormDataToScoreInput, type RentFormData } from '../lib/adapter'
 import { calculateScore, type ScoreResult } from '../lib/score'
 import { loadRentFormData } from '../lib/storage'
 
+// 三维进度条配置：要新增/调整顺序只改这一处
+type NumericScoreKey = 'commuteScore' | 'liveScore' | 'lifeScore'
+const SCORE_BARS: ReadonlyArray<{ key: NumericScoreKey; label: string }> = [
+  { key: 'commuteScore', label: '通勤评分' },
+  { key: 'liveScore', label: '居住舒适度' },
+  { key: 'lifeScore', label: '生活便利度' },
+]
+
 export default function ResultPage() {
   const [formData, setFormData] = useState<RentFormData | null>(null)
 
@@ -31,22 +39,28 @@ export default function ResultPage() {
               <p className="mt-2 text-body-md font-medium text-on-surface">{score.persona}</p>
             </div>
             <div className="text-right text-body-sm text-on-surface-variant">
-              <div>房租占比：<span className="font-semibold text-on-surface">{score.rentRatio}%</span></div>
-              <div>压力指数：<span className="font-semibold text-on-surface">{score.stress}</span></div>
+              <div>
+                房租占比：<span className="font-semibold text-on-surface">{score.rentRatio}%</span>
+              </div>
+              <div>
+                压力指数：<span className="font-semibold text-on-surface">{score.stress}</span>
+              </div>
             </div>
           </div>
 
           <div className="mt-stack-md grid grid-cols-1 gap-3 text-body-sm md:grid-cols-3">
-            <ScoreBar label="通勤评分" value={score.commuteScore} />
-            <ScoreBar label="居住舒适度" value={score.liveScore} />
-            <ScoreBar label="生活便利度" value={score.lifeScore} />
+            {SCORE_BARS.map((bar) => (
+              <ScoreBar key={bar.key} label={bar.label} value={score[bar.key]} />
+            ))}
           </div>
         </section>
       )}
 
       {formData && (
         <section className="mx-auto mb-10 max-w-[800px] rounded-3xl border border-outline-variant/30 bg-white p-stack-lg soft-shadow">
-          <h2 className="mb-stack-md text-headline-sm font-semibold text-on-surface">已接收到的输入数据</h2>
+          <h2 className="mb-stack-md text-headline-sm font-semibold text-on-surface">
+            已接收到的输入数据
+          </h2>
           <div className="grid grid-cols-1 gap-3 text-body-sm text-on-surface-variant md:grid-cols-2">
             <div>月薪资：￥{formData.salary || '未填写'}</div>
             <div>月租金：￥{formData.rent || '未填写'}</div>

@@ -36,8 +36,7 @@ function findSelectByLabel(root: HTMLElement, labelText: string): HTMLSelectElem
 
 const valueOf = (el: HTMLInputElement | HTMLSelectElement | null) => el?.value ?? ''
 
-const getLabelText = (element: Element) =>
-  element.querySelector('label')?.textContent?.trim() ?? ''
+const getLabelText = (element: Element) => element.querySelector('label')?.textContent?.trim() ?? ''
 
 const collectActiveOptions = (root: HTMLElement) => {
   const activeOptions: Record<string, string[]> = {}

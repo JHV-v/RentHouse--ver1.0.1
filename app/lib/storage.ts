@@ -15,14 +15,7 @@ type StoredPayload = {
 function isRentFormData(value: unknown): value is RentFormData {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
-  const stringFields = [
-    'salary',
-    'rent',
-    'deposit',
-    'agencyFee',
-    'paymentCycle',
-    'contractTerm',
-  ]
+  const stringFields = ['salary', 'rent', 'deposit', 'agencyFee', 'paymentCycle', 'contractTerm']
   for (const f of stringFields) {
     if (typeof v[f] !== 'string') return false
   }
@@ -34,11 +27,7 @@ function isRentFormData(value: unknown): value is RentFormData {
 function isStoredPayload(value: unknown): value is StoredPayload {
   if (typeof value !== 'object' || value === null) return false
   const v = value as Record<string, unknown>
-  return (
-    typeof v.version === 'number' &&
-    typeof v.savedAt === 'number' &&
-    isRentFormData(v.data)
-  )
+  return typeof v.version === 'number' && typeof v.savedAt === 'number' && isRentFormData(v.data)
 }
 
 export function saveRentFormData(data: RentFormData): void {

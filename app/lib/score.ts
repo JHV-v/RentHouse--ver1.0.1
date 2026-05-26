@@ -3,6 +3,8 @@
 // 输入 → 标准化 → 评分 → 人格
 // ============================================================
 
+import { pickPersona } from './personas'
+
 const DEFAULT_SCORE = 3 as const
 
 // 标签字典：UI 中文标签 → 1-5 数值；未匹配时回落到 DEFAULT_SCORE
@@ -158,27 +160,6 @@ export function normalizeInput(rawInput: RawScoreInput | null | undefined): Scor
 }
 
 // ============================================================
-// 人格系统：10 档
-// ============================================================
-
-const PERSONAS: Array<{ min: number; label: string }> = [
-  { min: 90, label: '天选之房' },
-  { min: 80, label: '人生赢家' },
-  { min: 70, label: '稳定幸福' },
-  { min: 60, label: '还不错' },
-  { min: 50, label: '勉强OK' },
-  { min: 40, label: '有点难受' },
-  { min: 30, label: '忍一忍' },
-  { min: 20, label: '打工地狱' },
-  { min: 10, label: '生活崩塌' },
-  { min: 0, label: '人间不值得' },
-]
-
-function pickPersona(score: number): string {
-  return PERSONAS.find((p) => score >= p.min)?.label ?? '人间不值得'
-}
-
-// ============================================================
 // 维度评分（各为 0-100 分）
 // ============================================================
 
@@ -215,9 +196,7 @@ function calcLifeScore(input: ScoreInput): number {
 function calcStress(rentRatio: number, commuteTime: number, income: number): number {
   const incomePenalty = income < 5000 ? 15 : income < 10000 ? 8 : 0
   return clamp(
-    Math.max(0, rentRatio - 20) * 1.5 +
-      Math.max(0, commuteTime - 30) * 0.4 +
-      incomePenalty,
+    Math.max(0, rentRatio - 20) * 1.5 + Math.max(0, commuteTime - 30) * 0.4 + incomePenalty,
   )
 }
 
@@ -259,6 +238,6 @@ export function calculateScore(rawInput: RawScoreInput | null | undefined): Scor
     liveScore: Math.round(liveScore),
     lifeScore: Math.round(lifeScore),
     stress: Math.round(stress),
-    persona: pickPersona(totalScore),
+    persona: pickPersona(totalScore).label,
   }
 }

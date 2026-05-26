@@ -2,17 +2,6 @@ import type { Config } from 'tailwindcss'
 
 const config: Config = {
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
-  // 这些类名由 Stitch HTML 内联的运行时 JS 动态注入到 DOM 上，
-  // 源代码字符串里搜不到，必须 safelist 否则会被 purge。
-  safelist: [
-    'tag-active',
-    'tag-inactive',
-    'detail-tag-active',
-    'detail-tag-inactive',
-    'drag-over',
-    'dragging',
-    'draggable-item',
-  ],
   theme: {
     extend: {
       colors: {
@@ -83,20 +72,26 @@ const config: Config = {
         base: '8px',
       },
       fontFamily: {
-        'headline-md': ['Inter'],
-        'headline-lg': ['Inter'],
-        'body-sm': ['Inter'],
-        'body-lg': ['Inter'],
-        'headline-sm': ['Inter'],
-        'display-lg': ['Inter'],
-        'label-sm': ['Inter'],
-        'label-md': ['Inter'],
-        'headline-lg-mobile': ['Inter'],
-        'body-md': ['Inter'],
+        'headline-md': ['Inter', 'system-ui', 'sans-serif'],
+        'headline-lg': ['Inter', 'system-ui', 'sans-serif'],
+        'body-sm': ['Inter', 'system-ui', 'sans-serif'],
+        'body-lg': ['Inter', 'system-ui', 'sans-serif'],
+        'headline-sm': ['Inter', 'system-ui', 'sans-serif'],
+        'display-lg': ['Inter', 'system-ui', 'sans-serif'],
+        'label-sm': ['Inter', 'system-ui', 'sans-serif'],
+        'label-md': ['Inter', 'system-ui', 'sans-serif'],
+        'headline-lg-mobile': ['Inter', 'system-ui', 'sans-serif'],
+        'body-md': ['Inter', 'system-ui', 'sans-serif'],
       },
       fontSize: {
-        'headline-md': ['24px', { lineHeight: '32px', letterSpacing: '-0.01em', fontWeight: '600' }],
-        'headline-lg': ['32px', { lineHeight: '40px', letterSpacing: '-0.02em', fontWeight: '600' }],
+        'headline-md': [
+          '24px',
+          { lineHeight: '32px', letterSpacing: '-0.01em', fontWeight: '600' },
+        ],
+        'headline-lg': [
+          '32px',
+          { lineHeight: '40px', letterSpacing: '-0.02em', fontWeight: '600' },
+        ],
         'body-sm': ['14px', { lineHeight: '20px', fontWeight: '400' }],
         'body-lg': ['18px', { lineHeight: '28px', fontWeight: '400' }],
         'headline-sm': ['20px', { lineHeight: '28px', fontWeight: '600' }],

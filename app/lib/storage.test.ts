@@ -58,8 +58,6 @@ describe('isStoredPayload', () => {
   })
 
   it('data 不合法被拒', () => {
-    expect(
-      isStoredPayload({ version: 1, savedAt: Date.now(), data: { foo: 'bar' } }),
-    ).toBe(false)
+    expect(isStoredPayload({ version: 1, savedAt: Date.now(), data: { foo: 'bar' } })).toBe(false)
   })
 })
