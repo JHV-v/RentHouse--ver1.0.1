@@ -1,9 +1,12 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { type MouseEvent } from 'react'
+import { type MouseEvent, useEffect, useRef } from 'react'
 import { inputHtml } from './stitch-html'
-import { saveRentFormData } from './lib/storage'
+import { saveRentFormData, loadRentFormData } from './lib/storage'
+import { incrementVisit, formatCount } from './lib/visitCounter'
+import { restoreFormData } from './lib/restoreFormData'
+import { updateRentHint } from './lib/rentHint'
 
 type RentFormData = {
   salary: string
@@ -16,12 +19,10 @@ type RentFormData = {
   commuteTimes: Record<string, string>
 }
 
-// 通过相邻的 <label> 文本定位输入项，避免按顺序取值在 UI 调整后错位
 function findInputByLabel(root: HTMLElement, labelText: string): HTMLInputElement | null {
   const labels = Array.from(root.querySelectorAll('label'))
   const label = labels.find((el) => el.textContent?.trim() === labelText)
   if (!label) return null
-  // input 与 label 同属一个 .space-y-2 容器
   const container = label.parentElement
   return container?.querySelector('input') ?? null
 }
@@ -93,21 +94,91 @@ const collectRentFormData = (root: HTMLElement): RentFormData => ({
   commuteTimes: collectCommuteTimes(root),
 })
 
+type ValidationResult =
+  | { ok: true }
+  | { ok: false; message: string }
+
+const validateFormData = (form: RentFormData): ValidationResult => {
+  const salary = parseFloat(form.salary)
+  const rent = parseFloat(form.rent)
+
+  if (!form.salary.trim() || !Number.isFinite(salary)) {
+    return { ok: false, message: '请填写月薪资 💼' }
+  }
+  if (salary <= 0) {
+    return { ok: false, message: '月薪资得是正数吧，老板再小气也不至于倒贴你 😅' }
+  }
+  if (!form.rent.trim() || !Number.isFinite(rent)) {
+    return { ok: false, message: '请填写月租金 🏠' }
+  }
+  if (rent <= 0) {
+    return { ok: false, message: '月租金得大于 0 哦，要是真的免费那就是赚到了 🎉' }
+  }
+  if (rent >= salary * 5) {
+    return {
+      ok: false,
+      message: '租金是收入的 5 倍以上，确定没填错？要不再核对一下 🤔',
+    }
+  }
+
+  return { ok: true }
+}
+
 export default function HomePage() {
   const router = useRouter()
+  const rootRef = useRef<HTMLDivElement | null>(null)
+
+  // mount 后增加访问计数，并把"今日访问 / 总访问"写死的占位值替换成真实值
+  useEffect(() => {
+    if (!rootRef.current) return
+    const stats = incrementVisit()
+
+    // 找到包含"今日访问"和"总访问"标签的两个父 span，再替换其内部 .font-semibold span
+    const allSpans = Array.from(rootRef.current.querySelectorAll<HTMLSpanElement>('span'))
+
+    const todayParent = allSpans.find((el) => el.textContent?.startsWith('今日访问:'))
+    const todayValue = todayParent?.querySelector<HTMLSpanElement>('.font-semibold')
+    if (todayValue) todayValue.textContent = formatCount(stats.today)
+
+    const totalParent = allSpans.find((el) => el.textContent?.startsWith('总访问:'))
+    const totalValue = totalParent?.querySelector<HTMLSpanElement>('.font-semibold')
+    if (totalValue) totalValue.textContent = formatCount(stats.total)
+
+    // 回填上一次保存的输入数据（从结果页返回时使用）
+    const saved = loadRentFormData()
+    if (saved) {
+      restoreFormData(rootRef.current, saved as RentFormData)
+    }
+
+    // 根据户型显示月租金填写提示
+    updateRentHint(rootRef.current)
+  }, [])
 
   const handleClick = (event: MouseEvent<HTMLDivElement>) => {
     const button = (event.target as HTMLElement).closest('button')
 
     if (button?.textContent?.includes('查看我的租房性价比报告')) {
       const formData = collectRentFormData(event.currentTarget)
+      const validation = validateFormData(formData)
+      if (!validation.ok) {
+        window.alert(validation.message)
+        return
+      }
       saveRentFormData(formData)
       router.push('/result')
+      return
+    }
+
+    // 标签按钮被点击后（如切换户型），等 stitch 内置脚本处理完 class 再刷新提示
+    if (button && rootRef.current) {
+      const root = rootRef.current
+      window.requestAnimationFrame(() => updateRentHint(root))
     }
   }
 
   return (
     <div
+      ref={rootRef}
       className="min-h-screen bg-gradient-to-b from-stone-50 to-orange-50/20 text-on-surface"
       onClick={handleClick}
       dangerouslySetInnerHTML={{ __html: inputHtml }}

@@ -1,4 +1,4 @@
-import type { RawScoreInput } from './score'
+import type { HousingType, RawScoreInput } from './score'
 
 // 输入页通过 sessionStorage 传过来的表单原始数据
 export type RentFormData = {
@@ -26,6 +26,15 @@ function pickCommuteTime(commuteTimes: Record<string, string> | undefined): numb
   return times.length === 0 ? 0 : Math.min(...times)
 }
 
+// 把"整租一居/整租二居/合租主卧/合租次卧"标签翻译为 HousingType
+function detectHousingType(tags: string[] | undefined): HousingType {
+  const tag = pickFirstTag(tags)
+  if (!tag) return 'unknown'
+  if (tag.startsWith('合租')) return 'shared'
+  if (tag.startsWith('整租')) return 'whole'
+  return 'unknown'
+}
+
 /**
  * 把输入页采集到的 RentFormData 转成 RawScoreInput；
  * 标签到 1-5 分数值的真正翻译交给 score.ts 的 normalizeInput 完成。
@@ -50,6 +59,7 @@ export function mapFormDataToScoreInput(form: RentFormData): RawScoreInput {
     facilities: pickFirstTag(options['家电配置'])?.length
       ? mapAppliance(pickFirstTag(options['家电配置']))
       : undefined,
+    housingType: detectHousingType(options['租赁类型']),
   }
 }
 

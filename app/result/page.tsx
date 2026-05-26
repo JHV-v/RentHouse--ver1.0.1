@@ -1,21 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { resultHtml } from '../stitch-html'
 import { mapFormDataToScoreInput, type RentFormData } from '../lib/adapter'
 import { calculateScore, type ScoreResult } from '../lib/score'
+import { type RawScoreInput } from '../lib/score'
 import { loadRentFormData } from '../lib/storage'
-
-// 三维进度条配置：要新增/调整顺序只改这一处
-type NumericScoreKey = 'commuteScore' | 'liveScore' | 'lifeScore'
-const SCORE_BARS: ReadonlyArray<{ key: NumericScoreKey; label: string }> = [
-  { key: 'commuteScore', label: '通勤评分' },
-  { key: 'liveScore', label: '居住舒适度' },
-  { key: 'lifeScore', label: '生活便利度' },
-]
+import { patchStitchResult } from '../lib/patchStitchResult'
 
 export default function ResultPage() {
+  const router = useRouter()
   const [formData, setFormData] = useState<RentFormData | null>(null)
+  const stitchRootRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     setFormData(loadRentFormData())
@@ -26,71 +23,44 @@ export default function ResultPage() {
     return calculateScore(mapFormDataToScoreInput(formData))
   }, [formData])
 
+  const rawInput: RawScoreInput | null = useMemo(() => {
+    if (!formData) return null
+    return mapFormDataToScoreInput(formData)
+  }, [formData])
+
+  // Stitch HTML 渲染完毕 + score 算出后，把写死的占位数据替换为真实数据
+  useEffect(() => {
+    if (!score || !rawInput || !stitchRootRef.current) return
+    patchStitchResult(stitchRootRef.current, score, rawInput)
+  }, [score, rawInput])
+
   return (
     <div className="min-h-screen bg-surface text-on-surface selection:bg-primary-fixed-dim">
-      <div dangerouslySetInnerHTML={{ __html: resultHtml }} />
+      {/* 返回修改按钮：固定在屏幕左上角，z-index 高于 stitch HTML 的 fixed header */}
+      <button
+        type="button"
+        onClick={() => router.push('/')}
+        aria-label="返回输入页修改"
+        className="fixed left-4 top-4 z-[100] flex items-center gap-1.5 rounded-full border border-outline-variant/30 bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-lg shadow-primary/30 transition-all hover:brightness-110 hover:shadow-xl active:scale-95"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m12 19-7-7 7-7" />
+          <path d="M19 12H5" />
+        </svg>
+        返回修改
+      </button>
 
-      {score && (
-        <section className="mx-auto mb-6 max-w-[800px] rounded-3xl border border-outline-variant/30 bg-white p-stack-lg soft-shadow">
-          <div className="flex items-center justify-between gap-stack-md">
-            <div>
-              <p className="text-body-sm text-on-surface-variant">综合性价比评分</p>
-              <p className="mt-1 text-5xl font-bold text-primary">{score.totalScore}</p>
-              <p className="mt-2 text-body-md font-medium text-on-surface">{score.persona}</p>
-            </div>
-            <div className="text-right text-body-sm text-on-surface-variant">
-              <div>
-                房租占比：<span className="font-semibold text-on-surface">{score.rentRatio}%</span>
-              </div>
-              <div>
-                压力指数：<span className="font-semibold text-on-surface">{score.stress}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-stack-md grid grid-cols-1 gap-3 text-body-sm md:grid-cols-3">
-            {SCORE_BARS.map((bar) => (
-              <ScoreBar key={bar.key} label={bar.label} value={score[bar.key]} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {formData && (
-        <section className="mx-auto mb-10 max-w-[800px] rounded-3xl border border-outline-variant/30 bg-white p-stack-lg soft-shadow">
-          <h2 className="mb-stack-md text-headline-sm font-semibold text-on-surface">
-            已接收到的输入数据
-          </h2>
-          <div className="grid grid-cols-1 gap-3 text-body-sm text-on-surface-variant md:grid-cols-2">
-            <div>月薪资：￥{formData.salary || '未填写'}</div>
-            <div>月租金：￥{formData.rent || '未填写'}</div>
-            <div>押金：{formData.deposit || '未选择'}</div>
-            <div>中介费：{formData.agencyFee || '未选择'}</div>
-            <div>付款周期：{formData.paymentCycle || '未选择'}</div>
-            <div>合同期限：{formData.contractTerm || '未选择'}</div>
-          </div>
-          <pre className="mt-stack-md max-h-80 overflow-auto rounded-2xl bg-surface-container-low p-stack-md text-xs leading-relaxed text-on-surface-variant">
-            {JSON.stringify(formData, null, 2)}
-          </pre>
-        </section>
-      )}
-    </div>
-  )
-}
-
-function ScoreBar({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl bg-surface-container-low p-3">
-      <div className="flex items-center justify-between text-on-surface-variant">
-        <span>{label}</span>
-        <span className="font-semibold text-on-surface">{value}</span>
-      </div>
-      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-stone-200/70">
-        <div
-          className="h-full rounded-full bg-primary transition-all"
-          style={{ width: `${value}%` }}
-        />
-      </div>
+      <div ref={stitchRootRef} dangerouslySetInnerHTML={{ __html: resultHtml }} />
     </div>
   )
 }

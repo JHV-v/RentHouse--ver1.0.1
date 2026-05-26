@@ -66,6 +66,9 @@ export const TAG_DICTIONARY = {
 
 export type ScoreField = keyof typeof TAG_DICTIONARY
 
+// 户型类型：影响评分中的若干权重
+export type HousingType = 'whole' | 'shared' | 'unknown'
+
 // 原始输入：标签可以是中文字符串、1-5 数字，或 undefined
 export type RawScoreInput = {
   rent?: number | string
@@ -78,6 +81,7 @@ export type RawScoreInput = {
   subway?: boolean
   food?: number | string
   facilities?: number | string
+  housingType?: HousingType
 }
 
 // 标准化后的输入：全部是确定的数值
@@ -92,6 +96,7 @@ export type ScoreInput = {
   subway: boolean
   food: number
   facilities: number
+  housingType: HousingType
 }
 
 export type ScoreResult = {
@@ -102,6 +107,7 @@ export type ScoreResult = {
   lifeScore: number
   stress: number
   persona: string
+  housingType: HousingType
 }
 
 // ============================================================
@@ -156,6 +162,7 @@ export function normalizeInput(rawInput: RawScoreInput | null | undefined): Scor
     subway: Boolean(safe.subway),
     food: clamp(toNumber(safe.food, DEFAULT_SCORE), 1, 5),
     facilities: clamp(toNumber(safe.facilities, DEFAULT_SCORE), 1, 5),
+    housingType: safe.housingType ?? 'unknown',
   }
 }
 
@@ -174,7 +181,16 @@ function calcCommuteScore(commuteTime: number): number {
 }
 
 // 居住舒适度：采光 25% + 空间 30% + 房况 25% + 噪音反向 20%
+// 合租场景下，空间和噪音对体验影响更大，权重重新分配：采光 20% + 空间 35% + 房况 20% + 噪音反向 25%
 function calcLiveScore(input: ScoreInput): number {
+  if (input.housingType === 'shared') {
+    return clamp(
+      scaleFromFive(input.sunlight) * 0.2 +
+        scaleFromFive(input.space) * 0.35 +
+        scaleFromFive(input.condition) * 0.2 +
+        reverseFromFive(input.noise) * 0.25,
+    )
+  }
   return clamp(
     scaleFromFive(input.sunlight) * 0.25 +
       scaleFromFive(input.space) * 0.3 +
@@ -193,10 +209,15 @@ function calcLifeScore(input: ScoreInput): number {
 }
 
 // 压力指数：房租超 20% 部分 ×1.5 + 通勤超 30 分钟部分 ×0.4 + 低收入惩罚
-function calcStress(rentRatio: number, commuteTime: number, income: number): number {
+// 合租场景轻度加压（与陌生人共享空间本身就是隐性压力）：+5 ~ +10
+function calcStress(rentRatio: number, commuteTime: number, income: number, housingType: HousingType): number {
   const incomePenalty = income < 5000 ? 15 : income < 10000 ? 8 : 0
+  const sharedPenalty = housingType === 'shared' ? 8 : 0
   return clamp(
-    Math.max(0, rentRatio - 20) * 1.5 + Math.max(0, commuteTime - 30) * 0.4 + incomePenalty,
+    Math.max(0, rentRatio - 20) * 1.5 +
+      Math.max(0, commuteTime - 30) * 0.4 +
+      incomePenalty +
+      sharedPenalty,
   )
 }
 
@@ -221,7 +242,7 @@ export function calculateScore(rawInput: RawScoreInput | null | undefined): Scor
   const commuteScore = calcCommuteScore(input.commuteTime)
   const liveScore = calcLiveScore(input)
   const lifeScore = calcLifeScore(input)
-  const stress = calcStress(rentRatio, input.commuteTime, input.income)
+  const stress = calcStress(rentRatio, input.commuteTime, input.income, input.housingType)
 
   const totalScore = clamp(
     rentScore * WEIGHTS.rent +
@@ -239,5 +260,6 @@ export function calculateScore(rawInput: RawScoreInput | null | undefined): Scor
     lifeScore: Math.round(lifeScore),
     stress: Math.round(stress),
     persona: pickPersona(totalScore).label,
+    housingType: input.housingType,
   }
 }

@@ -42,7 +42,7 @@
   }
 
   .detail-tag-active {
-    @apply bg-primary text-on-primary border-primary rounded-full px-4 py-2 shadow-md shadow-primary/25 transition-all duration-300 scale-[0.96] text-sm font-medium;
+    @apply bg-primary text-on-primary rounded-full px-4 py-2 shadow-lg shadow-primary/40 transition-all duration-300 text-sm font-bold scale-[1.05] ring-2 ring-primary/30 ring-offset-2 ring-offset-white cursor-pointer;
   }
 
   .btn-hover-effect {
