@@ -1,4 +1,5 @@
 // 访问计数：基于 localStorage 的本地真实计数（仅当前浏览器/设备）。
+// 同时支持 Vercel KV 远程计数，远程不可用时回退到 localStorage。
 // 每次页面加载调用 incrementVisit() 一次，返回最新的 { today, total }。
 
 const TOTAL_KEY = 'rent-visit-total'
@@ -58,6 +59,48 @@ export function incrementVisit(): VisitStats {
   safeWrite(TODAY_KEY, { date: todayKey, count: todayCount } satisfies TodayBucket)
 
   return { today: todayCount, total }
+}
+
+// ---- 远程计数（Vercel KV） ----
+
+export async function incrementVisitRemote(): Promise<VisitStats> {
+  try {
+    const res = await fetch('/api/visit-count', { method: 'POST' })
+    if (!res.ok) return { today: 0, total: 0 }
+    const data: VisitStats & { fallback?: boolean } = await res.json()
+    if (data.fallback) return { today: 0, total: 0 }
+    return { today: data.today, total: data.total }
+  } catch {
+    return { today: 0, total: 0 }
+  }
+}
+
+export async function getVisitStatsRemote(): Promise<VisitStats> {
+  try {
+    const res = await fetch('/api/visit-count', { method: 'GET' })
+    if (!res.ok) return getVisitStatsLocal()
+    const data: VisitStats = await res.json()
+    // If KV returned zeros because it's not configured, fall back to local
+    if (data.total === 0 && data.today === 0) return getVisitStatsLocal()
+    return data
+  } catch {
+    return getVisitStatsLocal()
+  }
+}
+
+function getVisitStatsLocal(): VisitStats {
+  if (typeof window === 'undefined') return { today: 0, total: 0 }
+  const totalRaw = safeRead<number>(TOTAL_KEY)
+  const total = typeof totalRaw === 'number' && Number.isFinite(totalRaw) ? totalRaw : 0
+  const todayKey = getTodayKey()
+  const todayBucket = safeRead<TodayBucket>(TODAY_KEY)
+  const todayCount = todayBucket?.date === todayKey ? todayBucket.count : 0
+  return { today: todayCount, total }
+}
+
+/** 返回远程统计（如果可用），否则回退到 localStorage */
+export async function getVisitStats(): Promise<VisitStats> {
+  return getVisitStatsRemote()
 }
 
 // 千分位格式化：1284 → "1,284"

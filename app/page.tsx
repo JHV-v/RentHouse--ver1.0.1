@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { type MouseEvent, useEffect, useRef } from 'react'
 import { inputHtml } from './stitch-html'
 import { saveRentFormData, loadRentFormData } from './lib/storage'
-import { incrementVisit, formatCount } from './lib/visitCounter'
+import { incrementVisit, incrementVisitRemote, formatCount } from './lib/visitCounter'
 import { restoreFormData } from './lib/restoreFormData'
 import { updateRentHint } from './lib/rentHint'
 import { type RentFormData } from './lib/adapter'
@@ -113,6 +113,8 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!rootRef.current) return
+
+    // 1. localStorage 快速更新（同步）
     const stats = incrementVisit()
 
     const allSpans = Array.from(rootRef.current.querySelectorAll<HTMLSpanElement>('span'))
@@ -124,6 +126,22 @@ export default function HomePage() {
     const totalParent = allSpans.find((el) => el.textContent?.startsWith('总访问:'))
     const totalValue = totalParent?.querySelector<HTMLSpanElement>('.font-semibold')
     if (totalValue) totalValue.textContent = formatCount(stats.total)
+
+    // 2. 远程 API 后台递增，成功后用更准确的服务端数据更新 DOM
+    incrementVisitRemote().then((remoteStats) => {
+      if (remoteStats.total > 0 || remoteStats.today > 0) {
+        const currentSpans = rootRef.current
+          ? Array.from(rootRef.current.querySelectorAll<HTMLSpanElement>('span'))
+          : []
+        const tParent = currentSpans.find((el) => el.textContent?.startsWith('今日访问:'))
+        const tValue = tParent?.querySelector<HTMLSpanElement>('.font-semibold')
+        if (tValue) tValue.textContent = formatCount(remoteStats.today)
+
+        const ttlParent = currentSpans.find((el) => el.textContent?.startsWith('总访问:'))
+        const ttlValue = ttlParent?.querySelector<HTMLSpanElement>('.font-semibold')
+        if (ttlValue) ttlValue.textContent = formatCount(remoteStats.total)
+      }
+    })
 
     // 回填：延迟一帧确保 stitch 内联脚本初始化完成后再写入
     const saved = loadRentFormData()
