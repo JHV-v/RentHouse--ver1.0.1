@@ -7,33 +7,8 @@ import { saveRentFormData, loadRentFormData } from './lib/storage'
 import { incrementVisit, formatCount } from './lib/visitCounter'
 import { restoreFormData } from './lib/restoreFormData'
 import { updateRentHint } from './lib/rentHint'
-
-type RentFormData = {
-  salary: string
-  rent: string
-  deposit: string
-  agencyFee: string
-  paymentCycle: string
-  contractTerm: string
-  activeOptions: Record<string, string[]>
-  commuteTimes: Record<string, string>
-}
-
-function findInputByLabel(root: HTMLElement, labelText: string): HTMLInputElement | null {
-  const labels = Array.from(root.querySelectorAll('label'))
-  const label = labels.find((el) => el.textContent?.trim() === labelText)
-  if (!label) return null
-  const container = label.parentElement
-  return container?.querySelector('input') ?? null
-}
-
-function findSelectByLabel(root: HTMLElement, labelText: string): HTMLSelectElement | null {
-  const labels = Array.from(root.querySelectorAll('label'))
-  const label = labels.find((el) => el.textContent?.trim() === labelText)
-  if (!label) return null
-  const container = label.parentElement
-  return container?.querySelector('select') ?? null
-}
+import { type RentFormData } from './lib/adapter'
+import { findInputByLabel, findSelectByLabel } from './lib/domUtils'
 
 const valueOf = (el: HTMLInputElement | HTMLSelectElement | null) => el?.value ?? ''
 
@@ -66,33 +41,41 @@ const collectActiveOptions = (root: HTMLElement) => {
   return activeOptions
 }
 
+const COMMUTE_LABELS = ['骑行', '公共交通', '驾车', '步行']
+
 const collectCommuteTimes = (root: HTMLElement) => {
   const commuteTimes: Record<string, string> = {}
+  const commuteOrder: string[] = []
 
   root.querySelectorAll('.draggable-item').forEach((item) => {
     const label = Array.from(item.querySelectorAll('span'))
       .map((span) => span.textContent?.trim() ?? '')
-      .find((text) => ['骑行', '公共交通', '驾车', '步行'].includes(text))
+      .find((text) => COMMUTE_LABELS.includes(text))
     const input = item.querySelector('input') as HTMLInputElement | null
 
     if (label) {
       commuteTimes[label] = input?.value ?? ''
+      commuteOrder.push(label)
     }
   })
 
-  return commuteTimes
+  return { commuteTimes, commuteOrder }
 }
 
-const collectRentFormData = (root: HTMLElement): RentFormData => ({
-  salary: valueOf(findInputByLabel(root, '月薪资')),
-  rent: valueOf(findInputByLabel(root, '月租金')),
-  deposit: valueOf(findSelectByLabel(root, '押金')),
-  agencyFee: valueOf(findSelectByLabel(root, '中介费')),
-  paymentCycle: valueOf(findSelectByLabel(root, '付款周期')),
-  contractTerm: valueOf(findSelectByLabel(root, '合同期限')),
-  activeOptions: collectActiveOptions(root),
-  commuteTimes: collectCommuteTimes(root),
-})
+const collectRentFormData = (root: HTMLElement): RentFormData => {
+  const { commuteTimes, commuteOrder } = collectCommuteTimes(root)
+  return {
+    salary: valueOf(findInputByLabel(root, '月薪资')),
+    rent: valueOf(findInputByLabel(root, '月租金')),
+    deposit: valueOf(findSelectByLabel(root, '押金')),
+    agencyFee: valueOf(findSelectByLabel(root, '中介费')),
+    paymentCycle: valueOf(findSelectByLabel(root, '付款周期')),
+    contractTerm: valueOf(findSelectByLabel(root, '合同期限')),
+    activeOptions: collectActiveOptions(root),
+    commuteTimes,
+    commuteOrder,
+  }
+}
 
 type ValidationResult =
   | { ok: true }
@@ -128,12 +111,10 @@ export default function HomePage() {
   const router = useRouter()
   const rootRef = useRef<HTMLDivElement | null>(null)
 
-  // mount 后增加访问计数，并把"今日访问 / 总访问"写死的占位值替换成真实值
   useEffect(() => {
     if (!rootRef.current) return
     const stats = incrementVisit()
 
-    // 找到包含"今日访问"和"总访问"标签的两个父 span，再替换其内部 .font-semibold span
     const allSpans = Array.from(rootRef.current.querySelectorAll<HTMLSpanElement>('span'))
 
     const todayParent = allSpans.find((el) => el.textContent?.startsWith('今日访问:'))
@@ -144,14 +125,17 @@ export default function HomePage() {
     const totalValue = totalParent?.querySelector<HTMLSpanElement>('.font-semibold')
     if (totalValue) totalValue.textContent = formatCount(stats.total)
 
-    // 回填上一次保存的输入数据（从结果页返回时使用）
+    // 回填：延迟一帧确保 stitch 内联脚本初始化完成后再写入
     const saved = loadRentFormData()
     if (saved) {
-      restoreFormData(rootRef.current, saved as RentFormData)
+      const root = rootRef.current
+      window.requestAnimationFrame(() => {
+        restoreFormData(root, saved)
+        updateRentHint(root)
+      })
+    } else {
+      updateRentHint(rootRef.current)
     }
-
-    // 根据户型显示月租金填写提示
-    updateRentHint(rootRef.current)
   }, [])
 
   const handleClick = (event: MouseEvent<HTMLDivElement>) => {
@@ -165,14 +149,16 @@ export default function HomePage() {
         return
       }
       saveRentFormData(formData)
-      router.push('/result')
+      router.push(`/result?t=${Date.now()}`)
       return
     }
 
-    // 标签按钮被点击后（如切换户型），等 stitch 内置脚本处理完 class 再刷新提示
     if (button && rootRef.current) {
       const root = rootRef.current
-      window.requestAnimationFrame(() => updateRentHint(root))
+      // 双重 rAF：第一帧等 stitch inline onclick 执行完，第二帧再读 class
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => updateRentHint(root))
+      })
     }
   }
 

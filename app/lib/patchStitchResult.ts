@@ -20,6 +20,7 @@ export function patchStitchResult(
   patchProsCons(root, ctx)
   patchAIRoast(root, ctx)
   patchRecommendations(root, ctx)
+  patchSummary(root, ctx)
 }
 
 // ============================================================
@@ -80,7 +81,19 @@ const heroBody = (persona: string): string => {
     : ['还不错', '勉强OK'].includes(persona)
       ? '性价比权衡达人'
       : '生存意志坚定的租房战士'
-  return `你属于：${tier}。懂得在预算内找平衡，不为虚荣买单，只为自在买心安。`
+  const suffix: Record<string, string> = {
+    天选之房: '各方面都相当能打，好好享受吧。',
+    人生赢家: '懂得在预算内找平衡，日子越过越有滋味。',
+    稳定幸福: '不为虚荣买单，只为自在买心安。',
+    还不错: '虽然不是满分，但至少住着不会闹心。',
+    勉强OK: '短板能忍，但别忘了给自己改善的机会。',
+    有点难受: '忍一忍不是长久之计，该出手时就出手。',
+    忍一忍: '挺住是暂时的，搬家才是正事。',
+    打工地狱: '住得比上班还累，真的不值得。',
+    生活崩塌: '已经不是将就的问题了，请认真考虑搬家。',
+    人间不值得: '这种居住条件是对自己的不负责，赶紧跑。',
+  }
+  return `你属于：${tier}。${suffix[persona] ?? '懂得在预算内找平衡，不为虚荣买单，只为自在买心安。'}`
 }
 
 // ============================================================
@@ -207,13 +220,16 @@ function replaceTagGroup(
 function patchAIRoast(root: HTMLElement, ctx: PatchContext): void {
   const { score, input } = ctx
 
-  // 精确定位：找到包含"AI 辣评"文本的 span，往上找所在的 section，再找 .italic
-  const allSpans = Array.from(root.querySelectorAll<HTMLElement>('span'))
-  const titleSpan = allSpans.find((el) => el.textContent?.trim() === 'AI 辣评')
-  const roastSection = titleSpan?.closest<HTMLElement>('section')
-  const roastEl = roastSection?.querySelector<HTMLElement>('.italic')
-  if (!roastEl) return
+  // 直接找带 italic class 的 div（辣评内容容器）
+  // 验证方式：它的前面兄弟元素里应该包含"AI 辣评"文字
+  const italicDivs = Array.from(root.querySelectorAll<HTMLElement>('div.italic'))
+  const roastEl = italicDivs.find((el) => {
+    // 往上找父容器，检查是否包含"AI 辣评"标题
+    const parent = el.parentElement
+    return parent?.textContent?.includes('AI 辣评')
+  })
 
+  if (!roastEl) return
   roastEl.textContent = `"${generateRoast(score, input)}"`
 }
 
@@ -325,6 +341,64 @@ function generateRecommendations(score: ScoreResult): string[] {
   }
 
   return recs
+}
+
+// ============================================================
+// 7. 综合评价
+// ============================================================
+
+function patchSummary(root: HTMLElement, ctx: PatchContext): void {
+  const { score, input } = ctx
+  const summaryDivs = Array.from(root.querySelectorAll<HTMLElement>('div.text-label-sm, div.leading-relaxed'))
+  const summaryEl = summaryDivs.find((el) => el.textContent?.includes('你的租房选择'))
+  if (!summaryEl) return
+  summaryEl.textContent = generateSummary(score, input)
+}
+
+function generateSummary(score: ScoreResult, input: RawScoreInput): string {
+  const norm = normalizeInput(input)
+  const parts: string[] = []
+
+  if (score.totalScore >= 80) {
+    parts.push('这房子的性价比相当能打')
+  } else if (score.totalScore >= 60) {
+    parts.push('你的租房选择基本在掌控之中')
+  } else if (score.totalScore >= 40) {
+    parts.push('目前的居住条件有明显的取舍')
+  } else {
+    parts.push('当前的居住条件需要认真改善')
+  }
+
+  if (norm.sunlight >= 4 && norm.noise <= 1) {
+    parts.push('采光、安静表现均衡，是下班回家的避风港')
+  } else if (norm.sunlight >= 4) {
+    parts.push('采光是你这房子的一大亮点')
+  } else if (norm.noise <= 1) {
+    parts.push('安静的环境是你租房的一大加分项')
+  } else if (norm.noise >= 4) {
+    parts.push('噪音问题可能会影响你的休息质量')
+  } else if (norm.sunlight <= 2) {
+    parts.push('采光不足可能会影响居住体验')
+  }
+
+  if (score.rentRatio <= 25) {
+    parts.push('租金压力不大，经济上比较从容')
+  } else if (score.rentRatio >= 40) {
+    parts.push('租金占比较高，经济上需要精打细算')
+  }
+
+  if (score.commuteScore >= 70) {
+    parts.push('通勤轻松，省下的时间可以好好生活')
+  } else if (score.commuteScore <= 40) {
+    parts.push('通勤耗时较长，每天在路上消耗不少精力')
+  }
+
+  if (parts.length === 1) {
+    if (score.totalScore >= 60) parts.push('整体来说住着还算舒心')
+    else parts.push('建议关注核心短板，尽早改善')
+  }
+
+  return parts.join('。') + '。'
 }
 
 // ============================================================

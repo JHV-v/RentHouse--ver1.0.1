@@ -1,7 +1,7 @@
 import type { RentFormData } from './adapter'
 
 // 当 RentFormData 结构变化时，把 VERSION 升一位，旧数据会被自动丢弃
-const STORAGE_VERSION = 1
+const STORAGE_VERSION = 2
 const STORAGE_KEY = 'rentFormData'
 
 type StoredPayload = {
@@ -21,6 +21,8 @@ function isRentFormData(value: unknown): value is RentFormData {
   }
   if (typeof v.activeOptions !== 'object' || v.activeOptions === null) return false
   if (typeof v.commuteTimes !== 'object' || v.commuteTimes === null) return false
+  // commuteOrder 是可选的（向后兼容 v1）
+  if (v.commuteOrder !== undefined && !Array.isArray(v.commuteOrder)) return false
   return true
 }
 

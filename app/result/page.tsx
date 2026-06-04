@@ -1,22 +1,38 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { resultHtml } from '../stitch-html'
 import { mapFormDataToScoreInput, type RentFormData } from '../lib/adapter'
 import { calculateScore, type ScoreResult } from '../lib/score'
 import { type RawScoreInput } from '../lib/score'
 import { loadRentFormData } from '../lib/storage'
 import { patchStitchResult } from '../lib/patchStitchResult'
 
-export default function ResultPage() {
+function ResultContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [formData, setFormData] = useState<RentFormData | null>(null)
+  const [resultHtml, setResultHtml] = useState<string>('')
   const stitchRootRef = useRef<HTMLDivElement | null>(null)
+  const [submitTs, setSubmitTs] = useState<number>(0)
 
   useEffect(() => {
-    setFormData(loadRentFormData())
+    import('../stitch-result-html').then((mod) => setResultHtml(mod.resultHtml))
   }, [])
+
+  useEffect(() => {
+    const t = searchParams.get('t')
+    if (t) {
+      setSubmitTs(Number(t))
+    }
+    const data = loadRentFormData()
+    if (data) {
+      setFormData(data)
+    } else if (!t) {
+      router.replace('/')
+    }
+  }, [searchParams, router])
 
   const score: ScoreResult | null = useMemo(() => {
     if (!formData) return null
@@ -28,15 +44,41 @@ export default function ResultPage() {
     return mapFormDataToScoreInput(formData)
   }, [formData])
 
-  // Stitch HTML 渲染完毕 + score 算出后，把写死的占位数据替换为真实数据
   useEffect(() => {
-    if (!score || !rawInput || !stitchRootRef.current) return
+    if (!score || !rawInput || !resultHtml || !stitchRootRef.current || !submitTs) return
     patchStitchResult(stitchRootRef.current, score, rawInput)
-  }, [score, rawInput])
+  }, [score, rawInput, resultHtml, submitTs])
+
+  if (!resultHtml || !formData) {
+    if (!formData && resultHtml) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-surface">
+          <div className="flex flex-col items-center gap-4 text-center px-6">
+            <span className="material-symbols-outlined text-5xl text-on-surface-variant/40">sentiment_dissatisfied</span>
+            <p className="text-on-surface-variant">暂无评测数据，请先填写租房信息</p>
+            <button
+              type="button"
+              onClick={() => router.replace('/')}
+              className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-on-primary shadow-lg shadow-primary/30 transition-all hover:brightness-110 active:scale-95"
+            >
+              去填写
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-on-surface-variant">正在生成你的租房报告...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-surface text-on-surface selection:bg-primary-fixed-dim">
-      {/* 返回修改按钮：固定在屏幕左上角，z-index 高于 stitch HTML 的 fixed header */}
       <button
         type="button"
         onClick={() => router.push('/')}
@@ -62,5 +104,22 @@ export default function ResultPage() {
 
       <div ref={stitchRootRef} dangerouslySetInnerHTML={{ __html: resultHtml }} />
     </div>
+  )
+}
+
+export default function ResultPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-surface">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            <p className="text-sm text-on-surface-variant">正在生成你的租房报告...</p>
+          </div>
+        </div>
+      }
+    >
+      <ResultContent />
+    </Suspense>
   )
 }

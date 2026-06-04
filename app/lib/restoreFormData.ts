@@ -2,22 +2,8 @@
 // 包括：基础数值/下拉、所有标签（tag-active/inactive 切换）、生活小细节、通勤时间。
 
 import type { RentFormData } from './adapter'
-
-function findInputByLabel(root: HTMLElement, labelText: string): HTMLInputElement | null {
-  const labels = Array.from(root.querySelectorAll('label'))
-  const label = labels.find((el) => el.textContent?.trim() === labelText)
-  if (!label) return null
-  const container = label.parentElement
-  return container?.querySelector('input') ?? null
-}
-
-function findSelectByLabel(root: HTMLElement, labelText: string): HTMLSelectElement | null {
-  const labels = Array.from(root.querySelectorAll('label'))
-  const label = labels.find((el) => el.textContent?.trim() === labelText)
-  if (!label) return null
-  const container = label.parentElement
-  return container?.querySelector('select') ?? null
-}
+import { findInputByLabel, findSelectByLabel } from './domUtils'
+import { CITY_TYPE_MIGRATION } from './cityTypeMigration'
 
 function getLabelText(group: Element): string {
   return group.querySelector('label')?.textContent?.trim() ?? ''
@@ -33,6 +19,11 @@ function activateTagButtons(group: Element, activeTexts: string[]): void {
     btn.classList.remove('tag-active', 'tag-inactive')
     btn.classList.add(shouldBeActive ? 'tag-active' : 'tag-inactive')
   })
+}
+
+// 迁移旧版城市类型标签
+function migrateCityType(activeTexts: string[]): string[] {
+  return activeTexts.map((t) => CITY_TYPE_MIGRATION[t] ?? t)
 }
 
 export function restoreFormData(root: HTMLElement, data: RentFormData): void {
@@ -63,7 +54,9 @@ export function restoreFormData(root: HTMLElement, data: RentFormData): void {
       if (!label) return
       const activeTexts = data.activeOptions[label]
       if (!activeTexts || activeTexts.length === 0) return
-      activateTagButtons(group, activeTexts)
+      // 城市类型标签迁移：旧版"三线/四线/县城/乡镇" → "三线及以下"
+      const migratedTexts = label === '城市类型' ? migrateCityType(activeTexts) : activeTexts
+      activateTagButtons(group, migratedTexts)
     })
   })
 
@@ -81,7 +74,7 @@ export function restoreFormData(root: HTMLElement, data: RentFormData): void {
     })
   }
 
-  // 5. 通勤时间输入框
+  // 5. 通勤时间输入框（只写值，不移动 DOM 顺序，避免触发拖拽脚本冲突）
   root.querySelectorAll('.draggable-item').forEach((item) => {
     const label = Array.from(item.querySelectorAll('span'))
       .map((span) => span.textContent?.trim() ?? '')
@@ -89,6 +82,17 @@ export function restoreFormData(root: HTMLElement, data: RentFormData): void {
     if (!label) return
     const input = item.querySelector('input') as HTMLInputElement | null
     const value = data.commuteTimes[label]
-    if (input && value) input.value = value
+    if (input && value !== undefined && value !== '') {
+      // 用原生 setter 设值，确保 React/stitch 脚本能感知
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value',
+      )?.set
+      if (nativeInputValueSetter) {
+        nativeInputValueSetter.call(input, value)
+      } else {
+        input.value = value
+      }
+    }
   })
 }

@@ -7,6 +7,7 @@ const baseInput = {
   rent: 3000,
   income: 10000,
   commuteTime: 30,
+  commuteWeighted: 30,
   sunlight: 3,
   noise: 3,
   space: 3,
@@ -14,14 +15,20 @@ const baseInput = {
   subway: false,
   food: 3,
   facilities: 3,
+  cityType: 3,
+  utility: 3,
+  floor: 3,
+  bathroom: 3,
+  kitchen: 3,
+  housingType: 'whole' as const,
 } as const
 
 describe('calculateScore - 单调性', () => {
   it('通勤时间越短，commuteScore 越高（exp 衰减）', () => {
-    const r5 = calculateScore({ ...baseInput, commuteTime: 5 })
-    const r30 = calculateScore({ ...baseInput, commuteTime: 30 })
-    const r60 = calculateScore({ ...baseInput, commuteTime: 60 })
-    const r120 = calculateScore({ ...baseInput, commuteTime: 120 })
+    const r5 = calculateScore({ ...baseInput, commuteTime: 5, commuteWeighted: 5 })
+    const r30 = calculateScore({ ...baseInput, commuteTime: 30, commuteWeighted: 30 })
+    const r60 = calculateScore({ ...baseInput, commuteTime: 60, commuteWeighted: 60 })
+    const r120 = calculateScore({ ...baseInput, commuteTime: 120, commuteWeighted: 120 })
     expect(r5.commuteScore).toBeGreaterThan(r30.commuteScore)
     expect(r30.commuteScore).toBeGreaterThan(r60.commuteScore)
     expect(r60.commuteScore).toBeGreaterThan(r120.commuteScore)
@@ -54,7 +61,7 @@ describe('calculateScore - 单调性', () => {
 
 describe('calculateScore - 边界值与契约', () => {
   it('commuteTime=0 时 commuteScore 应等于 100（exp(0)=1）', () => {
-    const r = calculateScore({ ...baseInput, commuteTime: 0 })
+    const r = calculateScore({ ...baseInput, commuteTime: 0, commuteWeighted: 0 })
     expect(r.commuteScore).toBe(100)
   })
 

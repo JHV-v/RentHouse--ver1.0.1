@@ -1,6 +1,6 @@
 import type { HousingType, RawScoreInput } from './score'
+import { CITY_TYPE_MIGRATION } from './cityTypeMigration'
 
-// 输入页通过 sessionStorage 传过来的表单原始数据
 export type RentFormData = {
   salary: string
   rent: string
@@ -10,23 +10,13 @@ export type RentFormData = {
   contractTerm: string
   activeOptions: Record<string, string[]>
   commuteTimes: Record<string, string>
+  commuteOrder: string[]
 }
 
-// 从一组已选标签里挑第一个非空的；没有则返回 undefined 让 score.normalizeInput 兜底
 function pickFirstTag(tags: string[] | undefined): string | undefined {
   return tags?.find((t) => t && t.length > 0)
 }
 
-// 表单的通勤是一组 {骑行,公共交通,驾车,步行: 分钟}，取最短非零值当代表通勤时间
-function pickCommuteTime(commuteTimes: Record<string, string> | undefined): number {
-  if (!commuteTimes) return 0
-  const times = Object.values(commuteTimes)
-    .map((v) => Number(v))
-    .filter((n) => Number.isFinite(n) && n > 0)
-  return times.length === 0 ? 0 : Math.min(...times)
-}
-
-// 把"整租一居/整租二居/合租主卧/合租次卧"标签翻译为 HousingType
 function detectHousingType(tags: string[] | undefined): HousingType {
   const tag = pickFirstTag(tags)
   if (!tag) return 'unknown'
@@ -35,36 +25,86 @@ function detectHousingType(tags: string[] | undefined): HousingType {
   return 'unknown'
 }
 
-/**
- * 把输入页采集到的 RentFormData 转成 RawScoreInput；
- * 标签到 1-5 分数值的真正翻译交给 score.ts 的 normalizeInput 完成。
- * 这里只做"字段对齐"。
- */
+// 按拖拽顺序加权计算等效通勤时间
+// 排在第1位的权重最高(×1.0)，第2位(×0.7)，第3位(×0.4)，第4位(×0.2)
+// 0min 的出行方式跳过不参与计算
+function calcWeightedCommute(
+  commuteTimes: Record<string, string> | undefined,
+  commuteOrder: string[] | undefined,
+): number {
+  if (!commuteTimes) return 0
+  const weights = [1.0, 0.7, 0.4, 0.2]
+  let totalWeighted = 0
+  let totalWeight = 0
+
+  const order = commuteOrder && commuteOrder.length > 0
+    ? commuteOrder
+    : Object.keys(commuteTimes)
+
+  order.forEach((key, idx) => {
+    const minutes = Number(commuteTimes[key])
+    if (!Number.isFinite(minutes) || minutes <= 0) return
+    const w = weights[idx] ?? 0.1
+    totalWeighted += minutes * w
+    totalWeight += w
+  })
+
+  return totalWeight > 0 ? totalWeighted / totalWeight : 0
+}
+
+// 兼容旧版：取最短非零通勤
+function pickCommuteTime(commuteTimes: Record<string, string> | undefined): number {
+  if (!commuteTimes) return 0
+  const times = Object.values(commuteTimes)
+    .map((v) => Number(v))
+    .filter((n) => Number.isFinite(n) && n > 0)
+  return times.length === 0 ? 0 : Math.min(...times)
+}
+
+function migrateCityType(tag: string | undefined): string | undefined {
+  if (!tag) return tag
+  return CITY_TYPE_MIGRATION[tag] ?? tag
+}
+
+function hasSubwayAccess(
+  commuteTimes: Record<string, string> | undefined,
+  convenienceTags: string[] | undefined,
+): boolean {
+  if (commuteTimes) {
+    const publicTransit = Number(commuteTimes['公共交通'])
+    if (Number.isFinite(publicTransit) && publicTransit > 0) return true
+  }
+  const tag = pickFirstTag(convenienceTags)
+  return tag === '很方便'
+}
+
 export function mapFormDataToScoreInput(form: RentFormData): RawScoreInput {
   const options = form.activeOptions ?? {}
-  // 合租场景下"周边便利度"标签可能挂在不同 section 上，做一次回退
   const convenience = options['周边便利度'] ?? options['配套便利']
 
   return {
     rent: form.rent,
     income: form.salary,
     commuteTime: pickCommuteTime(form.commuteTimes),
+    commuteWeighted: calcWeightedCommute(form.commuteTimes, form.commuteOrder),
     sunlight: pickFirstTag(options['采光通风']),
     noise: pickFirstTag(options['隔音水平']),
     space: pickFirstTag(options['空间感觉']),
     condition: pickFirstTag(options['家电配置']),
-    // TODO: UI 暂未单独提供 subway 勾选项；待补充后从 form.subway 透传
-    subway: false,
+    subway: hasSubwayAccess(form.commuteTimes, convenience),
     food: pickFirstTag(convenience)?.length ? mapConvenience(pickFirstTag(convenience)) : undefined,
     facilities: pickFirstTag(options['家电配置'])?.length
       ? mapAppliance(pickFirstTag(options['家电配置']))
       : undefined,
     housingType: detectHousingType(options['租赁类型']),
+    cityType: migrateCityType(pickFirstTag(options['城市类型'])),
+    utility: pickFirstTag(options['水电收费']),
+    floor: pickFirstTag(options['楼层类型']),
+    bathroom: pickFirstTag(options['卫浴体验 (合租)']),
+    kitchen: pickFirstTag(options['厨房体验 (合租)']),
   }
 }
 
-// 这两个小映射表只在 adapter 内部使用：UI 标签 → 1-5 数值
-// （food/facilities 在 score.ts 的 TAG_DICTIONARY 里没有对应字典，所以在 adapter 这一层映射）
 const CONVENIENCE_MAP: Record<string, number> = {
   很方便: 5,
   方便: 4,
