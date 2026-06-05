@@ -1,52 +1,11 @@
-import type { ScoreResult } from './score'
-import type { RawScoreInput } from './score'
-import { normalizeInput, TAG_DICTIONARY } from './score'
-
-type PatchContext = {
-  score: ScoreResult
-  input: RawScoreInput
-}
-
-export function patchStitchResult(
-  root: HTMLElement,
-  score: ScoreResult,
-  input: RawScoreInput,
-): void {
-  const ctx: PatchContext = { score, input }
-
-  patchHero(root, ctx)
-  patchBars(root, ctx)
-  patchBeatPercentile(root, ctx)
-  patchProsCons(root, ctx)
-  patchAIRoast(root, ctx)
-  patchRecommendations(root, ctx)
-  patchSummary(root, ctx)
-}
+import type { ScoreResult, RawScoreInput } from './score'
+import { normalizeInput } from './score'
 
 // ============================================================
-// 1. Hero 区：总分 + persona + 描述
+// Hero 文案
 // ============================================================
 
-function patchHero(root: HTMLElement, ctx: PatchContext): void {
-  const { score } = ctx
-
-  const heroNumber = root.querySelector<HTMLElement>('.font-display-lg.text-display-lg')
-  if (heroNumber) heroNumber.textContent = String(score.totalScore)
-
-  const heroTag = heroNumber?.parentElement?.querySelector<HTMLElement>('.font-label-md')
-  if (heroTag) heroTag.textContent = score.persona
-
-  // h1 标题："住得还行，心态稳住 🌿" → 根据 persona 替换
-  const h1 = root.querySelector<HTMLHeadingElement>('h1')
-  if (h1) h1.textContent = heroTitle(score.persona)
-
-  // h1 下方第一段 p：副标题
-  const subtitles = h1?.parentElement?.querySelectorAll<HTMLParagraphElement>('p')
-  if (subtitles && subtitles[0]) subtitles[0].textContent = heroSubtitle(score.persona)
-  if (subtitles && subtitles[1]) subtitles[1].textContent = heroBody(score.persona)
-}
-
-const heroTitle = (persona: string): string => {
+export function heroTitle(persona: string): string {
   const map: Record<string, string> = {
     天选之房: '这房简直为你量身定做 👑',
     人生赢家: '住得明明白白，日子风生水起 🎉',
@@ -62,7 +21,7 @@ const heroTitle = (persona: string): string => {
   return map[persona] ?? '住得还行，心态稳住 🌿'
 }
 
-const heroSubtitle = (persona: string): string => {
+export function heroSubtitle(persona: string): string {
   if (persona === '天选之房') return '采光、安静、交通全在线，租房界的锦鲤就是你。'
   if (persona === '人生赢家') return '虽然不是梦中情房，但至少下班回来不会崩溃。'
   if (persona === '稳定幸福') return '虽然不是梦中情房，但至少下班回来不会崩溃。'
@@ -75,7 +34,7 @@ const heroSubtitle = (persona: string): string => {
   return '这房子……不是给人住的吧？'
 }
 
-const heroBody = (persona: string): string => {
+export function heroBody(persona: string): string {
   const tier = ['天选之房', '人生赢家', '稳定幸福'].includes(persona)
     ? '生活感捕捉专家'
     : ['还不错', '勉强OK'].includes(persona)
@@ -97,68 +56,30 @@ const heroBody = (persona: string): string => {
 }
 
 // ============================================================
-// 2. 进度条
+// 评分条工具
 // ============================================================
 
-function patchBars(root: HTMLElement, ctx: PatchContext): void {
-  const { score } = ctx
-  const barConfig: Array<{ label: string; value: number }> = [
-    { label: '房租占收入', value: clampPct(score.rentRatio) },
-    { label: '通勤效率', value: score.commuteScore },
-    { label: '居住舒适度', value: score.liveScore },
-    { label: '生活便利度', value: score.lifeScore },
-  ]
+export function clampPct(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, value))
+}
 
-  for (const bar of barConfig) {
-    const barRow = findBarRow(root, bar.label)
-    if (barRow) setBarValue(barRow, bar.value)
-  }
+export function stressTier(stress: number): string {
+  if (stress < 25) return '轻松'
+  if (stress < 50) return '中等'
+  if (stress < 75) return '偏高'
+  return '高压'
+}
 
-  const stressRow = findBarRow(root, '压力指数')
-  if (stressRow) {
-    const tier = stressTier(score.stress)
-    setBarValue(stressRow, score.stress, `${tier} (${score.stress}%)`)
-  }
+export function beatPercentile(total: number): number {
+  return clampPct(Math.round(total * 0.85 + 5))
 }
 
 // ============================================================
-// 3. 击败百分比
+// 居住优势 / 微小烦恼
 // ============================================================
 
-function patchBeatPercentile(root: HTMLElement, ctx: PatchContext): void {
-  const { score } = ctx
-  const beatTag = Array.from(root.querySelectorAll<HTMLElement>('span')).find((el) =>
-    /击败了\s*\d+%/.test(el.textContent ?? ''),
-  )
-  if (beatTag) {
-    beatTag.textContent = `你已经击败了 ${beatPercentile(score.totalScore)}% 的租房打工人`
-  }
-}
-
-// ============================================================
-// 4. 居住优势 / 微小的烦恼
-// ============================================================
-
-function patchProsCons(root: HTMLElement, ctx: PatchContext): void {
-  const { score, input } = ctx
-  const pros = generatePros(score, input)
-  const cons = generateCons(score, input)
-
-  replaceTagGroup(
-    root,
-    '居住优势',
-    pros,
-    'bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full text-body-sm font-semibold',
-  )
-  replaceTagGroup(
-    root,
-    '微小的烦恼',
-    cons,
-    'bg-orange-50 text-orange-700 px-4 py-2 rounded-full text-body-sm font-semibold',
-  )
-}
-
-function generatePros(score: ScoreResult, input: RawScoreInput): string[] {
+export function generatePros(score: ScoreResult, input: RawScoreInput): string[] {
   const pros: string[] = []
   const norm = normalizeInput(input)
 
@@ -176,7 +97,7 @@ function generatePros(score: ScoreResult, input: RawScoreInput): string[] {
   return pros.slice(0, 4)
 }
 
-function generateCons(score: ScoreResult, input: RawScoreInput): string[] {
+export function generateCons(score: ScoreResult, input: RawScoreInput): string[] {
   const cons: string[] = []
   const norm = normalizeInput(input)
 
@@ -196,48 +117,14 @@ function generateCons(score: ScoreResult, input: RawScoreInput): string[] {
   return cons.slice(0, 4)
 }
 
-function replaceTagGroup(
-  root: HTMLElement,
-  sectionTitle: string,
-  tags: string[],
-  tagClass: string,
-): void {
-  // 找到 h3 标题包含 sectionTitle 的 section
-  const h3s = Array.from(root.querySelectorAll<HTMLHeadingElement>('h3'))
-  const targetH3 = h3s.find((el) => el.textContent?.includes(sectionTitle))
-  if (!targetH3) return
-
-  const tagContainer = targetH3.parentElement?.querySelector<HTMLElement>('.flex.flex-wrap')
-  if (!tagContainer) return
-
-  tagContainer.innerHTML = tags.map((tag) => `<span class="${tagClass}">${tag}</span>`).join('')
-}
-
 // ============================================================
-// 5. AI 辣评
+// AI 辣评
 // ============================================================
 
-function patchAIRoast(root: HTMLElement, ctx: PatchContext): void {
-  const { score, input } = ctx
-
-  // 直接找带 italic class 的 div（辣评内容容器）
-  // 验证方式：它的前面兄弟元素里应该包含"AI 辣评"文字
-  const italicDivs = Array.from(root.querySelectorAll<HTMLElement>('div.italic'))
-  const roastEl = italicDivs.find((el) => {
-    // 往上找父容器，检查是否包含"AI 辣评"标题
-    const parent = el.parentElement
-    return parent?.textContent?.includes('AI 辣评')
-  })
-
-  if (!roastEl) return
-  roastEl.textContent = `"${generateRoast(score, input)}"`
-}
-
-function generateRoast(score: ScoreResult, input: RawScoreInput): string {
+export function generateRoast(score: ScoreResult, input: RawScoreInput): string {
   const parts: string[] = []
-  const norm = normalizeInput(input) // 把中文标签转成 1-5 数值
+  const norm = normalizeInput(input)
 
-  // 户型相关吐槽
   if (norm.housingType === 'shared') {
     if (norm.noise >= 4) {
       parts.push('合租 + 隔音差，等于和室友"灵魂共振"')
@@ -248,7 +135,6 @@ function generateRoast(score: ScoreResult, input: RawScoreInput): string {
     }
   }
 
-  // 根据房租占比开喷
   if (score.rentRatio >= 60) {
     parts.push('工资大半交了房租，你这不是租房，是给房东打工')
   } else if (score.rentRatio >= 40) {
@@ -259,7 +145,6 @@ function generateRoast(score: ScoreResult, input: RawScoreInput): string {
     parts.push('租金友好到让人怀疑你是不是有内部关系')
   }
 
-  // 根据通勤开喷
   if (score.commuteScore <= 20) {
     parts.push('通勤远到能在路上把一部电影看完')
   } else if (score.commuteScore <= 40) {
@@ -268,7 +153,6 @@ function generateRoast(score: ScoreResult, input: RawScoreInput): string {
     parts.push('通勤轻松到让人嫉妒')
   }
 
-  // 根据居住条件开喷（用标准化后的数值：noise 1=安静 5=吵）
   if (norm.noise >= 4) {
     parts.push('隔音差到邻居打呼噜你都能跟着节奏拍手')
   } else if (norm.noise <= 1) {
@@ -286,14 +170,12 @@ function generateRoast(score: ScoreResult, input: RawScoreInput): string {
     parts.push('房况堪忧，住久了容易怀疑人生')
   }
 
-  // 根据压力指数收尾
   if (score.stress >= 70) {
     parts.push('综合压力爆表，建议认真考虑换个活法')
   } else if (score.stress >= 50) {
     parts.push('压力不小，但打工人不都这样嘛')
   }
 
-  // 如果没收集到任何槽点，用总分兜底
   if (parts.length === 0) {
     if (score.totalScore >= 80) return '这房子怕不是你上辈子修来的福报，各方面都挺能打，别人看了都眼红。'
     if (score.totalScore >= 60) return '说好听叫性价比之选，说难听点就是妥协的艺术。不过嘛，至少不会每天回家想骂人。'
@@ -301,61 +183,24 @@ function generateRoast(score: ScoreResult, input: RawScoreInput): string {
     return '住在这种条件下还能笑出来的人，不是心态好就是已经麻了。认真建议：搬家。'
   }
 
-  // 拼接：前几句用逗号，最后一句用句号
   return parts.slice(0, 3).join('，') + '。'
 }
 
 // ============================================================
-// 6. 专家共识
+// 专家共识
 // ============================================================
 
-function patchRecommendations(root: HTMLElement, ctx: PatchContext): void {
-  const { score } = ctx
-  const h3s = Array.from(root.querySelectorAll<HTMLHeadingElement>('h3'))
-  const recH3 = h3s.find((el) => el.textContent?.includes('专家共识'))
-  if (!recH3) return
-
-  const items = recH3.parentElement?.querySelectorAll<HTMLElement>(
-    '.flex.items-center.gap-stack-md',
-  )
-  if (!items || items.length === 0) return
-
-  const recs = generateRecommendations(score)
-  recs.forEach((rec, i) => {
-    if (items[i]) {
-      const span = items[i].querySelector<HTMLElement>('span:last-child')
-      if (span) span.textContent = rec
-    }
-  })
-}
-
-function generateRecommendations(score: ScoreResult): string[] {
-  const recs: string[] = []
-
-  if (score.totalScore >= 70) {
-    recs.push('适合长期居住', '综合性价比高', '值得续租')
-  } else if (score.totalScore >= 50) {
-    recs.push('短期过渡可考虑', '建议货比三家', '关注短板改善')
-  } else {
-    recs.push('建议尽快换房', '优先改善通勤', '控制租金占比')
-  }
-
-  return recs
+export function generateRecommendations(score: ScoreResult): string[] {
+  if (score.totalScore >= 70) return ['适合长期居住', '综合性价比高', '值得续租']
+  if (score.totalScore >= 50) return ['短期过渡可考虑', '建议货比三家', '关注短板改善']
+  return ['建议尽快换房', '优先改善通勤', '控制租金占比']
 }
 
 // ============================================================
-// 7. 综合评价
+// 综合评价
 // ============================================================
 
-function patchSummary(root: HTMLElement, ctx: PatchContext): void {
-  const { score, input } = ctx
-  const summaryDivs = Array.from(root.querySelectorAll<HTMLElement>('div.text-label-sm, div.leading-relaxed'))
-  const summaryEl = summaryDivs.find((el) => el.textContent?.includes('你的租房选择'))
-  if (!summaryEl) return
-  summaryEl.textContent = generateSummary(score, input)
-}
-
-function generateSummary(score: ScoreResult, input: RawScoreInput): string {
+export function generateSummary(score: ScoreResult, input: RawScoreInput): string {
   const norm = normalizeInput(input)
   const parts: string[] = []
 
@@ -399,39 +244,4 @@ function generateSummary(score: ScoreResult, input: RawScoreInput): string {
   }
 
   return parts.join('。') + '。'
-}
-
-// ============================================================
-// 工具函数
-// ============================================================
-
-function clampPct(value: number): number {
-  if (!Number.isFinite(value)) return 0
-  return Math.max(0, Math.min(100, value))
-}
-
-function findBarRow(root: HTMLElement, labelText: string): HTMLElement | null {
-  const labelSpans = Array.from(root.querySelectorAll<HTMLElement>('span'))
-  const labelSpan = labelSpans.find((el) => el.textContent?.trim().endsWith(labelText))
-  return labelSpan?.closest<HTMLElement>('.space-y-2') ?? null
-}
-
-function setBarValue(row: HTMLElement, value: number, customText?: string): void {
-  const headerRow = row.querySelector<HTMLElement>('.flex.justify-between')
-  const valueSpan = headerRow?.querySelector<HTMLElement>('.font-bold')
-  if (valueSpan) valueSpan.textContent = customText ?? `${value}%`
-
-  const progressBar = row.querySelector<HTMLElement>('.h-full')
-  if (progressBar) progressBar.style.width = `${clampPct(value)}%`
-}
-
-function stressTier(stress: number): string {
-  if (stress < 25) return '轻松'
-  if (stress < 50) return '中等'
-  if (stress < 75) return '偏高'
-  return '高压'
-}
-
-function beatPercentile(total: number): number {
-  return clampPct(Math.round(total * 0.85 + 5))
 }
