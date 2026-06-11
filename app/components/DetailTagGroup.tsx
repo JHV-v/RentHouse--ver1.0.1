@@ -17,9 +17,9 @@ export default function DetailTagGroup({ label, options, values, onChange }: Det
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <label className="font-label-md text-label-md text-on-surface-variant">{label}</label>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2.5">
         {options.map((opt) => {
           const isActive = values.includes(opt)
           return (

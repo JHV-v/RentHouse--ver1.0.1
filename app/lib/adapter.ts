@@ -1,5 +1,4 @@
 import type { HousingType, RawScoreInput } from './score'
-import { CITY_TYPE_MIGRATION } from './cityTypeMigration'
 
 export type RentFormData = {
   salary: string
@@ -59,6 +58,13 @@ function pickCommuteTime(commuteTimes: Record<string, string> | undefined): numb
     .map((v) => Number(v))
     .filter((n) => Number.isFinite(n) && n > 0)
   return times.length === 0 ? 0 : Math.min(...times)
+}
+
+const CITY_TYPE_MIGRATION: Record<string, string> = {
+  '三线': '三线及以下',
+  '四线': '三线及以下',
+  '县城': '三线及以下',
+  '乡镇': '三线及以下',
 }
 
 function migrateCityType(tag: string | undefined): string | undefined {

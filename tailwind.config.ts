@@ -2,15 +2,6 @@ import type { Config } from 'tailwindcss'
 
 const config: Config = {
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}'],
-  safelist: [
-    'tag-active',
-    'tag-inactive',
-    'detail-tag-active',
-    'detail-tag-inactive',
-    'drag-over',
-    'dragging',
-    'draggable-item',
-  ],
   theme: {
     extend: {
       colors: {

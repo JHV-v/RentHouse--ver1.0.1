@@ -87,13 +87,15 @@ export default function RentForm({ initialData, onSubmit }: RentFormProps) {
     <main className="max-w-xl mx-auto px-4 py-12 space-y-8">
       <HeaderSection />
 
-      <div className="bg-white rounded-3xl border border-outline-variant/30 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-3xl border border-stone-100/60 overflow-hidden transition-all duration-500 shadow-[0_20px_50px_rgba(0,0,0,0.05),0_1px_4px_rgba(0,0,0,0.02)]">
         {/* 基础开销 */}
-        <section className="p-6 space-y-6">
-          <div className="flex items-center gap-2">
+        <section className="p-8 space-y-10">
+          <div className="flex items-center gap-2 pb-2 border-b border-stone-50">
             <span className="material-symbols-outlined text-primary">payments</span>
             <h2 className="font-headline-sm text-headline-sm text-on-surface">基础开销</h2>
           </div>
+
+          <div className="space-y-6">
 
           <TagSelectGroup
             label="城市类型"
@@ -134,15 +136,19 @@ export default function RentForm({ initialData, onSubmit }: RentFormProps) {
             onChange={(v) => updateOption('水电收费', v)}
             variant="segmented"
           />
+          </div>
         </section>
 
         <div className="h-px bg-stone-100" />
 
         {/* 通勤出行 */}
-        <section className="p-6 space-y-6">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">commute</span>
-            <h2 className="font-headline-sm text-headline-sm text-on-surface">通勤出行</h2>
+        <section className="p-8 space-y-10">
+          <div className="flex items-center justify-between pb-2 border-b border-stone-50">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">commute</span>
+              <h2 className="font-headline-sm text-headline-sm text-on-surface">通勤出行</h2>
+            </div>
+            <div className="text-[10px] font-bold text-stone-400 bg-stone-100 px-2 py-0.5 rounded uppercase tracking-wider">长按 ↕ 排序权重</div>
           </div>
 
           <CommuteInput
@@ -156,11 +162,13 @@ export default function RentForm({ initialData, onSubmit }: RentFormProps) {
         <div className="h-px bg-stone-100" />
 
         {/* 居住体验 */}
-        <section className="p-6 space-y-6">
-          <div className="flex items-center gap-2">
+        <section className="p-8 space-y-10">
+          <div className="flex items-center gap-2 pb-2 border-b border-stone-50">
             <span className="material-symbols-outlined text-primary">home_work</span>
             <h2 className="font-headline-sm text-headline-sm text-on-surface">居住体验</h2>
           </div>
+
+          <div className="space-y-6">
 
           <TagSelectGroup
             label="采光通风"
@@ -176,6 +184,7 @@ export default function RentForm({ initialData, onSubmit }: RentFormProps) {
             options={NOISE_OPTIONS}
             value={form.activeOptions['隔音水平']?.[0]}
             onChange={(v) => updateOption('隔音水平', v)}
+            variant="segmented"
           />
 
           <TagSelectGroup
@@ -183,6 +192,7 @@ export default function RentForm({ initialData, onSubmit }: RentFormProps) {
             options={CONVENIENCE_OPTIONS}
             value={form.activeOptions['周边便利度']?.[0]}
             onChange={(v) => updateOption('周边便利度', v)}
+            variant="segmented"
           />
 
           <TagSelectGroup
@@ -198,6 +208,7 @@ export default function RentForm({ initialData, onSubmit }: RentFormProps) {
             options={FLOOR_OPTIONS}
             value={form.activeOptions['楼层类型']?.[0]}
             onChange={(v) => updateOption('楼层类型', v)}
+            variant="segmented"
           />
 
           <TagSelectGroup
@@ -205,47 +216,71 @@ export default function RentForm({ initialData, onSubmit }: RentFormProps) {
             options={APPLIANCE_OPTIONS}
             value={form.activeOptions['家电配置']?.[0]}
             onChange={(v) => updateOption('家电配置', v)}
+            variant="segmented"
           />
 
           {isShared && (
             <>
               <TagSelectGroup
                 label="卫浴体验 (合租)"
+                labelIcon="bathtub"
                 options={BATHROOM_OPTIONS}
                 value={form.activeOptions['卫浴体验 (合租)']?.[0]}
                 onChange={(v) => updateOption('卫浴体验 (合租)', v)}
+                variant="segmented"
               />
               <TagSelectGroup
                 label="厨房体验 (合租)"
+                labelIcon="restaurant"
                 options={KITCHEN_OPTIONS}
                 value={form.activeOptions['厨房体验 (合租)']?.[0]}
                 onChange={(v) => updateOption('厨房体验 (合租)', v)}
+                variant="segmented"
               />
             </>
           )}
+          </div>
         </section>
 
         <div className="h-px bg-stone-100" />
 
         {/* 生活小细节 */}
-        <section className="p-6 space-y-6">
-          <div className="flex items-center gap-2">
+        <section className="p-8 space-y-10">
+          <div className="flex items-center gap-2 pb-2 border-b border-stone-50">
             <span className="material-symbols-outlined text-primary">tips_and_updates</span>
             <h2 className="font-headline-sm text-headline-sm text-on-surface">生活小细节</h2>
           </div>
 
+          <div className="space-y-6">
           <DetailTagGroup
             label="生活小细节"
             options={DETAIL_OPTIONS}
             values={form.activeOptions['生活小细节'] ?? []}
             onChange={(v) => updateOption('生活小细节', v)}
           />
+          </div>
         </section>
 
         <div className="h-px bg-stone-100" />
 
         {/* 提交按钮 */}
-        <div className="p-6 bg-stone-50/80">
+        <div className="p-8 bg-stone-50/80 border-t border-stone-100 space-y-6">
+          <div className="flex justify-between items-center gap-4">
+            <div className="flex-1 text-center">
+              <div className="text-[10px] uppercase tracking-wider text-stone-400 font-bold mb-1">日均房租</div>
+              <div className="text-lg font-bold text-primary">￥0.00</div>
+            </div>
+            <div className="w-px h-10 bg-stone-200" />
+            <div className="flex-1 text-center">
+              <div className="text-[10px] uppercase tracking-wider text-stone-400 font-bold mb-1">月通勤</div>
+              <div className="text-lg font-bold text-primary">0h</div>
+            </div>
+            <div className="w-px h-10 bg-stone-200" />
+            <div className="flex-1 text-center">
+              <div className="text-[10px] uppercase tracking-wider text-stone-400 font-bold mb-1">性价比</div>
+              <div className="text-lg font-bold text-error">0.00</div>
+            </div>
+          </div>
           <button
             type="button"
             onClick={handleSubmit}
